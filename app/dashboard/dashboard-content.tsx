@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { DataTable, type Column, type Status, type DataItem } from '@/components/data-table'
+import { AddItemForm } from '@/components/add-item-form'
 
 type TableItem = DataItem
 
-const tableData: readonly TableItem[] = [
+const initialTableData: TableItem[] = [
   { id: '001', name: 'John Doe', status: 'Active', amount: 250.00 },
   { id: '002', name: 'Jane Smith', status: 'Pending', amount: 150.00 },
   { id: '003', name: 'Bob Johnson', status: 'Active', amount: 350.00 },
@@ -16,7 +17,7 @@ const tableData: readonly TableItem[] = [
   { id: '006', name: 'Diana Miller', status: 'Pending', amount: 650.00 },
   { id: '007', name: 'Edward Davis', status: 'Inactive', amount: 750.00 },
   { id: '008', name: 'Frank Thomas', status: 'Active', amount: 850.00 },
-] as const
+]
 
 const columns: Column<TableItem>[] = [
   { key: 'id', label: 'ID' },
@@ -47,10 +48,10 @@ const columns: Column<TableItem>[] = [
   },
 ]
 
-export default function DashboardContent() {
+export function DashboardContent() {
+  const [tableData, setTableData] = useState<TableItem[]>(initialTableData)
   const router = useRouter()
   const isAuthenticated = useAuth(state => state.isAuthenticated)
-  const user = useAuth(state => state.user)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -62,14 +63,25 @@ export default function DashboardContent() {
     return null
   }
 
+  const handleAddItem = (values: { name: string; status: Status; amount: string }) => {
+    const newItem: TableItem = {
+      id: String(tableData.length + 1).padStart(3, '0'),
+      name: values.name,
+      status: values.status,
+      amount: parseFloat(values.amount)
+    }
+    setTableData([...tableData, newItem])
+  }
+
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-gray-600">Welcome back, {user?.email}</p>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <AddItemForm onSubmit={handleAddItem} />
       </div>
-      
-      <DataTable data={tableData} columns={columns} />
+      <div className="container mx-auto py-10">
+        <DataTable columns={columns} data={tableData} />
+      </div>
     </div>
   )
 }

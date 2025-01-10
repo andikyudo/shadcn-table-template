@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, PlusCircle, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export type Status = 'Active' | 'Pending' | 'Inactive'
 
@@ -104,10 +104,6 @@ export function DataTable<T extends DataItem>({
             <option value="Inactive">Inactive</option>
           </select>
         </div>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add New
-        </Button>
       </div>
 
       <div className="rounded-md border">
