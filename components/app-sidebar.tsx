@@ -27,6 +27,7 @@ import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from './ui/button'
+import { ModeToggle } from '@/components/mode-toggle'
 import { cn } from '@/lib/utils'
 
 interface MenuItem {
@@ -182,15 +183,18 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="p-4 border-t">
-          <Button
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => logout()}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => logout()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+          <ModeToggle />
         </div>
       </SidebarFooter>
     </Sidebar>
