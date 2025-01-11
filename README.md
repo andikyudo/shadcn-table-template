@@ -27,6 +27,7 @@ To learn more about Next.js, take a look at the following resources:
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 - [Git Versioning Guide](https://git-scm.com/book/en/v2/Git-Basics-Recording-Changes-to-the-Repository) - learn about Git versioning.
+- [Database Documentation](https://www.postgresql.org/docs/) - learn about PostgreSQL database management.
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 

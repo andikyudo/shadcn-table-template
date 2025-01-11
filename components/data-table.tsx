@@ -11,7 +11,10 @@ import {
 } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { EditItemDialog } from './edit-item-dialog'
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth"
 
 export type Status = 'Active' | 'Pending' | 'Inactive'
 
@@ -31,40 +34,89 @@ export interface Column<T extends DataItem> {
 interface DataTableProps<T extends DataItem> {
   data: ReadonlyArray<T>
   columns: Array<Column<T>>
+  onItemUpdated?: (updatedItem: T) => void
+  onItemDeleted?: (deletedItemId: string) => void
 }
 
 export function DataTable<T extends DataItem>({ 
   data: initialData, 
-  columns 
+  columns,
+  onItemUpdated,
+  onItemDeleted
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = React.useState('')
   const [statusFilter, setStatusFilter] = React.useState<Status | ''>('')
   const [currentPage, setCurrentPage] = React.useState(1)
+  const [data, setData] = React.useState(initialData)
   const itemsPerPage = 5
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
 
   // Filter data based on search term and status
   const filteredData = React.useMemo(() => {
-    return initialData.filter(item => {
+    return data.filter(item => {
       const matchesSearch = Object.entries(item).some(
         ([key, value]) => {
           if (key === 'amount') {
             return value.toString().toLowerCase().includes(searchTerm.toLowerCase())
           }
-          return typeof value === 'string' && 
-            value.toLowerCase().includes(searchTerm.toLowerCase())
+          return value.toString().toLowerCase().includes(searchTerm.toLowerCase())
         }
       )
+
       const matchesStatus = !statusFilter || item.status === statusFilter
+
       return matchesSearch && matchesStatus
     })
-  }, [initialData, searchTerm, statusFilter])
+  }, [data, searchTerm, statusFilter])
 
-  // Calculate pagination
   const totalPages = Math.ceil(filteredData.length / itemsPerPage)
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage)
+
+  const handleItemUpdated = (updatedItem: T) => {
+    setData(prevData => 
+      prevData.map(item => 
+        item.id === updatedItem.id ? updatedItem : item
+      )
+    )
+    onItemUpdated?.(updatedItem)
+  }
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const response = await fetch(`/api/items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': JSON.stringify({ user })
+        }
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to delete item')
+      }
+
+      setData(prevData => prevData.filter(item => item.id !== itemId))
+      onItemDeleted?.(itemId)
+      
+      toast({
+        title: "Success",
+        description: "Item deleted successfully"
+      })
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete item"
+      })
+    }
+  }
 
   const renderCell = (column: Column<T>, row: T) => {
     const value = row[column.key]
@@ -125,9 +177,19 @@ export function DataTable<T extends DataItem>({
                   </TableCell>
                 ))}
                 <TableCell>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <EditItemDialog 
+                      item={row} 
+                      onItemUpdated={handleItemUpdated} 
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteItem(row.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
