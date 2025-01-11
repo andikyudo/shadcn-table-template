@@ -1,79 +1,136 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DataTable, type DataItem } from '@/components/data-table'
+import { DataTable, type DataItem, type Column } from '@/components/data-table'
 import { AddItemForm } from '@/components/add-item-form'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import { useToast } from '@/hooks/use-toast'
 
-const columns = [
-  { key: 'name', label: 'Name' },
-  { key: 'status', label: 'Status' },
+interface ExtendedDataItem extends DataItem {
+  userId: string
+}
+
+const columns: Column<ExtendedDataItem>[] = [
+  { 
+    key: 'name', 
+    label: 'Name',
+    render: (value: string | number) => value.toString()
+  },
+  { 
+    key: 'status', 
+    label: 'Status',
+    render: (value: string | number) => value.toString()
+  },
   { 
     key: 'amount', 
     label: 'Amount',
-    render: (value: number) => `$${value.toFixed(2)}`
+    render: (value: string | number) => `$${Number(value).toFixed(2)}`
   }
 ]
 
 export function DashboardContent() {
-  const [items, setItems] = useState<DataItem[]>([])
+  const [items, setItems] = useState<ExtendedDataItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
-  const isAuthenticated = useAuth(state => state.isAuthenticated)
+  const { toast } = useToast()
+  const { user, isAuthenticated } = useAuth()
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       router.push('/login')
+      return
     }
-  }, [isAuthenticated, router])
 
-  if (!isAuthenticated) {
-    return null
-  }
+    const fetchItems = async () => {
+      try {
+        const res = await fetch('/api/items', {
+          headers: {
+            'Authorization': JSON.stringify({ user })
+          }
+        })
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(error.message || 'Failed to fetch items')
+        }
+        const data = await res.json()
+        setItems(data)
+      } catch (error) {
+        console.error('Error fetching items:', error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to fetch items"
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  useEffect(() => {
-    // Fetch items when component mounts
-    fetch('/api/items')
-      .then(res => res.json())
-      .then(data => setItems(data))
-      .catch(error => console.error('Error fetching items:', error))
-  }, [])
+    fetchItems()
+  }, [isAuthenticated, user, router, toast])
 
   const handleAddItem = async (values: { name: string; status: string; amount: string }) => {
     try {
+      if (!user?.id) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "You must be logged in to add items"
+        })
+        return
+      }
+
       const response = await fetch('/api/items', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': JSON.stringify({ user })
         },
         body: JSON.stringify({
-          ...values,
-          amount: parseFloat(values.amount),
-          userId: items[0]?.userId || '' // Use the first user's ID for now
+          name: values.name,
+          status: values.status,
+          amount: parseFloat(values.amount)
         }),
       })
 
-      if (!response.ok) throw new Error('Failed to add item')
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to add item')
+      }
       
       const newItem = await response.json()
       setItems(prevItems => [...prevItems, newItem])
+      
+      toast({
+        title: "Success",
+        description: "Item added successfully"
+      })
     } catch (error) {
       console.error('Error adding item:', error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add item"
+      })
     }
   }
 
+  if (!isAuthenticated || !user) {
+    return null
+  }
+
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+    <div className="container mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-8">Dashboard</h1>
+      <div className="mb-8">
         <AddItemForm onSubmit={handleAddItem} />
       </div>
-      <div className="container mx-auto py-10">
-        <DataTable
-          data={items}
-          columns={columns}
-        />
-      </div>
+      {isLoading ? (
+        <div className="text-center">Loading items...</div>
+      ) : (
+        <DataTable columns={columns} data={items} />
+      )}
     </div>
   )
 }
