@@ -1,55 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { DataTable, type DataItem } from '@/components/data-table'
+import { AddItemForm } from '@/components/add-item-form'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
-import { DataTable, type Column, type Status, type DataItem } from '@/components/data-table'
-import { AddItemForm } from '@/components/add-item-form'
 
-type TableItem = DataItem
-
-const initialTableData: TableItem[] = [
-  { id: '001', name: 'John Doe', status: 'Active', amount: 250.00 },
-  { id: '002', name: 'Jane Smith', status: 'Pending', amount: 150.00 },
-  { id: '003', name: 'Bob Johnson', status: 'Active', amount: 350.00 },
-  { id: '004', name: 'Alice Brown', status: 'Inactive', amount: 450.00 },
-  { id: '005', name: 'Charlie Wilson', status: 'Active', amount: 550.00 },
-  { id: '006', name: 'Diana Miller', status: 'Pending', amount: 650.00 },
-  { id: '007', name: 'Edward Davis', status: 'Inactive', amount: 750.00 },
-  { id: '008', name: 'Frank Thomas', status: 'Active', amount: 850.00 },
-]
-
-const columns: Column<TableItem>[] = [
-  { key: 'id', label: 'ID' },
+const columns = [
   { key: 'name', label: 'Name' },
-  { 
-    key: 'status', 
-    label: 'Status',
-    render: (value) => {
-      const status = value as Status
-      return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          status === 'Active' ? 'bg-green-100 text-green-800' :
-          status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
-          {status}
-        </span>
-      )
-    }
-  },
+  { key: 'status', label: 'Status' },
   { 
     key: 'amount', 
     label: 'Amount',
-    render: (value) => {
-      const amount = value as number
-      return `$${amount.toFixed(2)}`
-    }
-  },
+    render: (value: number) => `$${value.toFixed(2)}`
+  }
 ]
 
 export function DashboardContent() {
-  const [tableData, setTableData] = useState<TableItem[]>(initialTableData)
+  const [items, setItems] = useState<DataItem[]>([])
   const router = useRouter()
   const isAuthenticated = useAuth(state => state.isAuthenticated)
 
@@ -63,14 +31,35 @@ export function DashboardContent() {
     return null
   }
 
-  const handleAddItem = (values: { name: string; status: Status; amount: string }) => {
-    const newItem: TableItem = {
-      id: String(tableData.length + 1).padStart(3, '0'),
-      name: values.name,
-      status: values.status,
-      amount: parseFloat(values.amount)
+  useEffect(() => {
+    // Fetch items when component mounts
+    fetch('/api/items')
+      .then(res => res.json())
+      .then(data => setItems(data))
+      .catch(error => console.error('Error fetching items:', error))
+  }, [])
+
+  const handleAddItem = async (values: { name: string; status: string; amount: string }) => {
+    try {
+      const response = await fetch('/api/items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...values,
+          amount: parseFloat(values.amount),
+          userId: items[0]?.userId || '' // Use the first user's ID for now
+        }),
+      })
+
+      if (!response.ok) throw new Error('Failed to add item')
+      
+      const newItem = await response.json()
+      setItems(prevItems => [...prevItems, newItem])
+    } catch (error) {
+      console.error('Error adding item:', error)
     }
-    setTableData([...tableData, newItem])
   }
 
   return (
@@ -80,7 +69,10 @@ export function DashboardContent() {
         <AddItemForm onSubmit={handleAddItem} />
       </div>
       <div className="container mx-auto py-10">
-        <DataTable columns={columns} data={tableData} />
+        <DataTable
+          data={items}
+          columns={columns}
+        />
       </div>
     </div>
   )
