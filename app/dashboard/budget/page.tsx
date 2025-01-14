@@ -1,44 +1,40 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import React, { useState, useMemo } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { 
   Undo2, 
   Redo2, 
-  Plus
+  Plus,
+  MoreHorizontal
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { AddTransactionDialog } from "@/components/add-transaction-dialog"
-import { EditTransactionDialog } from "@/components/edit-transaction-dialog"
-import { ImportTransactionsDialog } from "@/components/import-transactions-dialog"
-import { TransactionActionsMenu } from "@/components/transaction-actions-menu"
+import { TransactionInlineEdit } from "@/components/transaction-inline-edit"
 import { TransactionBulkActions } from "@/components/transaction-bulk-actions"
 import { TransactionFilters, TransactionFilters as ITransactionFilters } from "@/components/transaction-filters"
 import { TransactionSort, SortConfig } from "@/components/transaction-sort"
-import { useTransactions, Transaction } from "@/context/transaction-context"
+import { useTransactions } from "@/context/transaction-context"
 import { useHistory } from "@/context/history-context"
-import { TransactionContextMenu } from "@/components/transaction-context-menu"
 import { TransactionInputRow } from "@/components/transaction-input-row"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function BudgetPage() {
-  const { transactions, toggleCleared } = useTransactions()
-  const { canUndo, canRedo, undo, redo, addToHistory } = useHistory()
+  const { transactions, addTransaction, toggleCleared, editTransaction, deleteTransaction } = useTransactions()
+  const { canUndo, canRedo, undo, redo } = useHistory()
   const [selectedTransactions, setSelectedTransactions] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [filters, setFilters] = useState<ITransactionFilters>({})
   const [sort, setSort] = useState<SortConfig | null>(null)
-  const [showAddTransaction, setShowAddTransaction] = useState(false)
 
   // Get unique accounts and categories for filters
   const accounts = useMemo(() => {
@@ -51,7 +47,7 @@ export default function BudgetPage() {
 
   // Apply filters and sort to transactions
   const filteredAndSortedTransactions = useMemo(() => {
-    let result = transactions.filter(transaction => {
+    const result = transactions.filter(transaction => {
       // Date range filter
       if (filters.startDate && new Date(transaction.date) < new Date(filters.startDate)) {
         return false
@@ -86,8 +82,8 @@ export default function BudgetPage() {
     // Apply sorting
     if (sort) {
       result.sort((a, b) => {
-        let aValue = a[sort.field]
-        let bValue = b[sort.field]
+        let aValue: string | number
+        let bValue: string | number
 
         // Handle special cases
         if (sort.field === "date") {
@@ -96,6 +92,10 @@ export default function BudgetPage() {
         } else if (sort.field === "outflow" || sort.field === "inflow") {
           aValue = Number(a[sort.field]) || 0
           bValue = Number(b[sort.field]) || 0
+        } else {
+          // For other fields, convert to string for comparison
+          aValue = String(a[sort.field] || '')
+          bValue = String(b[sort.field] || '')
         }
 
         if (aValue < bValue) return sort.direction === "asc" ? -1 : 1
@@ -129,66 +129,6 @@ export default function BudgetPage() {
     setSelectAll(false)
   }
 
-  const handleRowClick = (id: string) => {
-    if (selectedTransactions.includes(id)) {
-      setSelectedTransactions(selectedTransactions.filter(t => t !== id))
-    } else {
-      setSelectedTransactions([...selectedTransactions, id])
-    }
-  }
-
-  const handleApprove = (id: string) => {
-    // Implement approve logic
-  }
-
-  const handleReject = (id: string) => {
-    // Implement reject logic
-  }
-
-  const handleMarkCleared = (id: string) => {
-    toggleCleared(id)
-  }
-
-  const handleMarkUncleared = (id: string) => {
-    toggleCleared(id)
-  }
-
-  const handleMatch = (id: string) => {
-    // Implement match logic
-  }
-
-  const handleUnmatch = (id: string) => {
-    // Implement unmatch logic
-  }
-
-  const handleDuplicate = (id: string) => {
-    // Implement duplicate logic
-  }
-
-  const handleMakeRepeating = (id: string) => {
-    // Implement make repeating logic
-  }
-
-  const handleFlag = (id: string) => {
-    // Implement flag logic
-  }
-
-  const handleCategorize = (id: string) => {
-    // Implement categorize logic
-  }
-
-  const handleMoveToAccount = (id: string) => {
-    // Implement move to account logic
-  }
-
-  const handleExport = (id: string) => {
-    // Implement export logic
-  }
-
-  const handleDelete = (id: string) => {
-    // Implement delete logic
-  }
-
   // Calculate balances from filtered transactions
   const clearedBalance = filteredAndSortedTransactions.reduce((sum, t) => {
     if (t.cleared) {
@@ -207,7 +147,7 @@ export default function BudgetPage() {
   const workingBalance = clearedBalance + unclearedBalance
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 max-w-[2000px] mx-auto w-full">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       {/* Overview Balance */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-6">
@@ -261,31 +201,28 @@ export default function BudgetPage() {
       </div>
 
       {/* Main Content */}
-      <div className="w-full min-w-[1200px]">
+      <div className="flex flex-col flex-1 min-h-0">
         {/* Action Buttons */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="border-gray-300"
               onClick={() => setShowAddTransaction(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Transaction
             </Button>
-            <ImportTransactionsDialog />
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
               className="border-gray-300"
               onClick={undo}
               disabled={!canUndo}
             >
               <Undo2 className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
+            <Button
+              variant="outline"
               className="border-gray-300"
               onClick={redo}
               disabled={!canRedo}
@@ -312,171 +249,179 @@ export default function BudgetPage() {
         </div>
 
         {/* Transactions Table */}
-        <div 
-          className="rounded-md border-2"
-        >
-          <Table>
-            <TableHeader>
-              <TableRow 
-                className={cn(
-                  "h-[45px] border-b-2 border-gray-200",
-                  "hover:bg-transparent",
-                  "transition-all duration-200"
-                )}
-              >
-                <TableHead className="w-[50px] bg-gray-50/80 font-semibold">
-                  <Checkbox 
+        <div className="flex-1 border rounded-md bg-white">
+          <div className="flex flex-col h-full">
+            {/* Fixed Header */}
+            <div className="sticky top-0 z-20 bg-gray-50/80 border-b border-gray-200">
+              <div className="flex h-10">
+                <div className="w-[50px] shrink-0 flex items-center justify-center">
+                  <Checkbox
                     checked={selectAll}
                     onCheckedChange={handleSelectAll}
                   />
-                </TableHead>
-                <TableHead className="w-[50px] bg-gray-50/80" />
-                <TableHead className="w-[200px] bg-gray-50/80">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-semibold">ACCOUNT</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[200px] bg-gray-50/80">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-semibold">DATE</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[250px] bg-gray-50/80">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-semibold">PAYEE</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[250px] bg-gray-50/80">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-semibold">CATEGORY</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="min-w-[300px] bg-gray-50/80">
-                  <div className="flex items-center space-x-4">
-                    <span className="font-semibold">MEMO</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[200px] text-right bg-gray-50/80">
-                  <div className="flex items-center justify-end space-x-4">
-                    <span className="font-semibold">OUTFLOW</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[200px] text-right bg-gray-50/80">
-                  <div className="flex items-center justify-end space-x-4">
-                    <span className="font-semibold">INFLOW</span>
-                    <div className="flex-1" />
-                  </div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="[&_tr:not(:last-child)]:border-b-[1.5px] [&_tr:not(:last-child)]:border-gray-200">
-              {showAddTransaction && (
-                <TransactionInputRow 
-                  onSave={() => {
-                    setShowAddTransaction(false)
-                  }}
-                />
-              )}
-              {filteredAndSortedTransactions.map((transaction) => (
-                <TransactionContextMenu
-                  key={transaction.id}
-                  transaction={transaction}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  onMarkCleared={handleMarkCleared}
-                  onMarkUncleared={handleMarkUncleared}
-                  onMatch={handleMatch}
-                  onUnmatch={handleUnmatch}
-                  onDuplicate={handleDuplicate}
-                  onMakeRepeating={handleMakeRepeating}
-                  onFlag={handleFlag}
-                  onCategorize={handleCategorize}
-                  onMoveToAccount={handleMoveToAccount}
-                  onExport={handleExport}
-                  onDelete={handleDelete}
-                >
-                  <TableRow 
-                    onClick={() => handleRowClick(transaction.id)}
-                    className={cn(
-                      "h-[42px] transition-all duration-200",
-                      selectedTransactions.includes(transaction.id) 
-                        ? "bg-blue-50/50 hover:bg-blue-100/50" 
-                        : "hover:bg-gray-50/80",
-                      "animate-in fade-in-0 duration-200"
-                    )}
-                  >
-                    <TableCell className="py-1 font-medium">
-                      <Checkbox 
-                        checked={selectedTransactions.includes(transaction.id)}
-                        onCheckedChange={(checked) => 
-                          handleSelectTransaction(checked as boolean, transaction.id)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="py-1 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-4 w-4 p-0"
-                        onClick={() => toggleCleared(transaction.id)}
-                      >
-                        <div className={cn(
-                          "h-2 w-2 rounded-full mx-auto",
-                          transaction.cleared ? "bg-green-500" : "bg-gray-300"
-                        )} />
-                      </Button>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <span className="font-medium whitespace-nowrap">{transaction.account}</span>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <span className="whitespace-nowrap">{transaction.date}</span>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <span className="whitespace-nowrap">{transaction.payee}</span>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <span className="whitespace-nowrap">{transaction.category}</span>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <span className="truncate block max-w-[300px]">{transaction.memo}</span>
-                    </TableCell>
-                    <TableCell className="text-right py-1">
-                      <span className="font-medium text-red-600 whitespace-nowrap">
-                        {transaction.outflow ? `Rp${transaction.outflow}` : ""}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right py-1">
-                      <span className="font-medium text-green-600 whitespace-nowrap">
-                        {transaction.inflow ? `Rp${transaction.inflow}` : ""}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-1">
-                      <div className="opacity-0 group-hover:opacity-100">
-                        <TransactionActionsMenu 
-                          transaction={transaction}
-                          onEdit={setEditingTransaction}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                </TransactionContextMenu>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                </div>
+                <div className="w-[50px] shrink-0 flex items-center justify-center">
+                  <span className="sr-only">Status</span>
+                </div>
+                <div className="w-[180px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">ACCOUNT</span>
+                </div>
+                <div className="w-[140px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">DATE</span>
+                </div>
+                <div className="w-[220px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">PAYEE</span>
+                </div>
+                <div className="w-[220px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">CATEGORY</span>
+                </div>
+                <div className="flex-1 min-w-[250px] flex items-center px-4">
+                  <span className="font-semibold tracking-wider">MEMO</span>
+                </div>
+                <div className="w-[160px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">OUTFLOW</span>
+                </div>
+                <div className="w-[160px] shrink-0 flex items-center px-4">
+                  <span className="font-semibold tracking-wider">INFLOW</span>
+                </div>
+                <div className="w-[50px] shrink-0 flex items-center justify-center">
+                  <span className="sr-only">Actions</span>
+                </div>
+              </div>
+            </div>
 
-        <EditTransactionDialog
-          transaction={editingTransaction}
-          open={!!editingTransaction}
-          onOpenChange={(open) => !open && setEditingTransaction(null)}
-        />
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-auto">
+              {/* Regular Rows */}
+              <div className="min-h-0">
+                {/* Input Row at the top when shown */}
+                {showAddTransaction && (
+                  <div className="relative">
+                    <TransactionInputRow 
+                      onSave={(transaction) => {
+                        addTransaction(transaction)
+                        setShowAddTransaction(false)
+                      }}
+                      onCancel={() => setShowAddTransaction(false)}
+                    />
+                  </div>
+                )}
+                
+                {/* Transaction Rows */}
+                {filteredAndSortedTransactions.map((transaction) => (
+                  <div key={transaction.id} className="relative">
+                    {transaction.id === editingId ? (
+                      <TransactionInlineEdit
+                        transaction={transaction}
+                        onSave={(updatedData) => {
+                          editTransaction(transaction.id, updatedData)
+                          setEditingId(null)
+                        }}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    ) : (
+                      <div 
+                        className={cn(
+                          "flex h-[42px] hover:bg-gray-50/80 border-b border-gray-200",
+                          selectedTransactions.includes(transaction.id) && "bg-blue-50/50"
+                        )}
+                        onDoubleClick={() => setEditingId(transaction.id)}
+                      >
+                        <div className="w-[50px] shrink-0 flex items-center justify-center">
+                          <Checkbox
+                            checked={selectedTransactions.includes(transaction.id)}
+                            onCheckedChange={(checked) => handleSelectTransaction(checked as boolean, transaction.id)}
+                          />
+                        </div>
+                        <div className="w-[50px] shrink-0 flex items-center justify-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0"
+                            onClick={() => toggleCleared(transaction.id)}
+                          >
+                            <div className={cn(
+                              "h-2 w-2 rounded-full mx-auto",
+                              transaction.cleared ? "bg-green-500" : "bg-gray-300"
+                            )} />
+                          </Button>
+                        </div>
+                        <div className="w-[180px] shrink-0 flex items-center px-4">
+                          <span className="font-medium whitespace-nowrap">{transaction.account}</span>
+                        </div>
+                        <div className="w-[140px] shrink-0 flex items-center px-4">
+                          <span className="font-medium">{transaction.date}</span>
+                        </div>
+                        <div className="w-[220px] shrink-0 flex items-center px-4">
+                          <span className="font-medium">{transaction.payee}</span>
+                        </div>
+                        <div className="w-[220px] shrink-0 flex items-center px-4">
+                          <span className="font-medium">{transaction.category}</span>
+                        </div>
+                        <div className="flex-1 min-w-[250px] flex items-center px-4">
+                          <span className="font-medium">{transaction.memo}</span>
+                        </div>
+                        <div className="w-[160px] shrink-0 flex items-center px-4">
+                          <span className={cn(
+                            "font-medium",
+                            transaction.outflow && "text-red-600"
+                          )}>
+                            {transaction.outflow ? `Rp${transaction.outflow}` : ''}
+                          </span>
+                        </div>
+                        <div className="w-[160px] shrink-0 flex items-center px-4">
+                          <span className={cn(
+                            "font-medium",
+                            transaction.inflow && "text-green-600"
+                          )}>
+                            {transaction.inflow ? `Rp${transaction.inflow}` : ''}
+                          </span>
+                        </div>
+                        <div className="w-[50px] shrink-0 flex items-center justify-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-[160px]">
+                              <DropdownMenuItem
+                                onClick={() => setEditingId(transaction.id)}
+                              >
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => toggleCleared(transaction.id)}
+                              >
+                                {transaction.cleared ? 'Mark as Uncleared' : 'Mark as Cleared'}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => {
+                                  deleteTransaction(transaction.id)
+                                  // Clear selection if this transaction was selected
+                                  if (selectedTransactions.includes(transaction.id)) {
+                                    setSelectedTransactions(prev => prev.filter(id => id !== transaction.id))
+                                  }
+                                }}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

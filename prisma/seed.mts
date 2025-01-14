@@ -1,46 +1,75 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, FlowType, AccountType } from '@prisma/client'
+
 const prisma = new PrismaClient()
 
 async function main() {
-  // Create dummy users
-  const user1 = await prisma.user.create({
+  // Delete existing data
+  await prisma.transaction.deleteMany()
+  await prisma.category.deleteMany()
+  await prisma.account.deleteMany()
+  await prisma.user.deleteMany()
+
+  // Create admin user
+  const admin = await prisma.user.create({
     data: {
-      email: 'user1@example.com',
-      name: 'User One',
-      items: {
-        create: [
-          {
-            name: 'Item 1',
-            status: 'Active',
-            amount: 100.0
-          },
-          {
-            name: 'Item 2', 
-            status: 'Pending',
-            amount: 200.0
-          }
-        ]
-      }
+      email: 'admin@example.com',
+      password: 'admin123',
+      name: 'Admin'
     }
   })
 
-  const user2 = await prisma.user.create({
-    data: {
-      email: 'user2@example.com',
-      name: 'User Two',
-      items: {
-        create: [
-          {
-            name: 'Item 3',
-            status: 'Inactive',
-            amount: 300.0
-          }
-        ]
+  // Create accounts
+  const accounts = await Promise.all([
+    prisma.account.create({
+      data: {
+        name: 'Cash',
+        type: AccountType.CASH,
+        balance: 1000000,
+        userId: admin.id
       }
-    }
-  })
+    }),
+    prisma.account.create({
+      data: {
+        name: 'Bank BCA',
+        type: AccountType.BANK,
+        balance: 5000000,
+        userId: admin.id
+      }
+    })
+  ])
 
-  console.log('Seeded data:', { user1, user2 })
+  // Create categories
+  const categories = [
+    { name: 'Gaji', type: FlowType.INCOME },
+    { name: 'Bonus', type: FlowType.INCOME },
+    { name: 'Investasi', type: FlowType.INCOME },
+    { name: 'Lainnya', type: FlowType.INCOME },
+    { name: 'Makan & Minum', type: FlowType.EXPENSE },
+    { name: 'Transport', type: FlowType.EXPENSE },
+    { name: 'Belanja', type: FlowType.EXPENSE },
+    { name: 'Hiburan', type: FlowType.EXPENSE },
+    { name: 'Kesehatan', type: FlowType.EXPENSE },
+    { name: 'Pendidikan', type: FlowType.EXPENSE },
+    { name: 'Tagihan', type: FlowType.EXPENSE },
+    { name: 'Lainnya', type: FlowType.EXPENSE }
+  ]
+
+  await Promise.all(
+    categories.map((category) =>
+      prisma.category.create({
+        data: {
+          name: category.name,
+          type: category.type,
+          userId: admin.id
+        }
+      })
+    )
+  )
+
+  console.log('Database has been seeded. \n')
+  console.log('User credentials:')
+  console.log('Email   : admin@example.com')
+  console.log('Password: admin123')
 }
 
 main()

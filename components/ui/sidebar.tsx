@@ -735,6 +735,39 @@ const SidebarMenuSubButton = React.forwardRef<
 })
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
+export type SidebarNavItemProps = React.ComponentProps<typeof SidebarMenuButton> & {
+  asChild?: boolean
+  isActive?: boolean
+}
+
+export const SidebarNavItem = React.forwardRef<HTMLButtonElement, SidebarNavItemProps>(
+  ({ asChild = false, isActive = false, ...props }, ref) => {
+    return (
+      <SidebarMenuButton
+        ref={ref}
+        asChild={asChild}
+        isActive={isActive}
+        {...props}
+      />
+    )
+  }
+)
+SidebarNavItem.displayName = "SidebarNavItem"
+
+export const SidebarNavItemsGroup = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div">
+>(({ className, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      className={cn("flex flex-col gap-1", className)}
+      {...props}
+    />
+  )
+})
+SidebarNavItemsGroup.displayName = "SidebarNavItemsGroup"
+
 export {
   Sidebar,
   SidebarContent,

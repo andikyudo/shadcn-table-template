@@ -115,9 +115,9 @@ export function TransactionFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                {categories.filter(Boolean).map((category) => (
+                  <SelectItem key={`category-${category}`} value={category || "uncategorized"}>
+                    {category || "Uncategorized"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -134,9 +134,9 @@ export function TransactionFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Accounts</SelectItem>
-                {accounts.map((account) => (
-                  <SelectItem key={account} value={account}>
-                    {account}
+                {accounts.filter(Boolean).map((account) => (
+                  <SelectItem key={`account-${account}`} value={account || "no-account"}>
+                    {account || "No Account"}
                   </SelectItem>
                 ))}
               </SelectContent>

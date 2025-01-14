@@ -11,27 +11,134 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  items     Item[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  email        String       @unique
+  password     String
+  name         String?
+  accounts     Account[]
+  categories   Category[]
+  transactions Transaction[]
+  budgets      Budget[]
+  financialGoals FinancialGoal[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
-model Item {
-  id        String   @id @default(cuid())
-  name      String
-  status    Status
-  amount    Float
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum FlowType {
+  INCOME
+  EXPENSE
+}
+
+enum CategoryType {
+  ACTIVE_INCOME    // Pendapatan Aktif
+  PASSIVE_INCOME   // Pendapatan Pasif
+  OTHER_INCOME     // Pendapatan Lain-lain
+  EXPENSE          // Pengeluaran
+}
+
+enum AccountType {
+  CASH
+  BANK
+  E_WALLET
+}
+
+model Category {
+  id           String       @id @default(cuid())
+  name         String
+  type         FlowType
+  categoryType CategoryType
+  description  String?
+  icon         String?      // Untuk menampilkan icon di UI
+  parentId     String?      // Untuk sub-kategori
+  parent       Category?    @relation("SubCategories", fields: [parentId], references: [id])
+  children     Category[]   @relation("SubCategories")
+  transactions Transaction[]
+  budgets      Budget[]
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Account {
+  id           String        @id @default(cuid())
+  name         String
+  type         AccountType
+  balance      Float
+  transactions Transaction[]
+  user         User          @relation(fields: [userId], references: [id])
+  userId       String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  date        DateTime
+  amount      Float
+  description String?
+  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  account     Account  @relation(fields: [accountId], references: [id])
+  accountId   String
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  month      Int
+  year       Int
+  amount     Float
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([month, year, categoryId, userId])
 }
 
 enum Status {
   Active
   Pending
   Inactive
+}
+
+model FinancialGoal {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  title         String
+  description   String?
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  deadline      DateTime?
+  category      GoalCategory
+  priority      Int       @default(3)
+  status        GoalStatus @default(IN_PROGRESS)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+enum GoalCategory {
+  VACATION
+  EDUCATION
+  HOME
+  VEHICLE
+  RETIREMENT
+  EMERGENCY
+  INVESTMENT
+  OTHER
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
 }

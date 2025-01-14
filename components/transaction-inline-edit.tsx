@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -9,41 +9,27 @@ import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { useTransactions, Transaction } from "@/context/transaction-context"
-import type { CheckedState } from "@radix-ui/react-checkbox"
+import { useTransactions } from "@/context/transaction-context"
+import type { Transaction } from "@/context/transaction-context"
 
-interface TransactionInputRowProps {
+interface TransactionInlineEditProps {
+  transaction: Transaction
   onSave?: (transaction: Transaction) => void
   onCancel?: () => void
 }
 
-export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowProps) {
-  const { addTransaction } = useTransactions()
-  const [isSelected, setIsSelected] = useState(false)
-  const rowRef = useRef<HTMLDivElement>(null)
+export function TransactionInlineEdit({ transaction, onSave, onCancel }: TransactionInlineEditProps) {
+  const { editTransaction } = useTransactions()
 
   const [formData, setFormData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    account: "Default Account",
-    payee: "",
-    category: "",
-    memo: "",
-    outflow: "",
-    inflow: ""
+    date: transaction.date,
+    account: transaction.account,
+    payee: transaction.payee,
+    category: transaction.category,
+    memo: transaction.memo,
+    outflow: transaction.outflow?.toString() || '',
+    inflow: transaction.inflow?.toString() || ''
   })
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (rowRef.current && !rowRef.current.contains(event.target as Node)) {
-        onCancel?.()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onCancel])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -56,36 +42,25 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
     const outflow = parseFloat(formData.outflow) || 0
     const inflow = parseFloat(formData.inflow) || 0
     
-    const newTransaction: Omit<Transaction, "id" | "cleared"> = {
+    const updatedTransaction: Omit<Transaction, "id"> = {
       date: formData.date,
       account: formData.account,
       payee: formData.payee || 'Need Input',
       category: formData.category || '',
       memo: formData.memo || '',
       outflow: outflow,
-      inflow: inflow
+      inflow: inflow,
+      cleared: transaction.cleared
     }
 
-    addTransaction(newTransaction)
+    editTransaction(transaction.id, updatedTransaction)
     
     if (onSave) {
       onSave({
-        ...newTransaction,
-        id: Math.floor(Math.random() * 1000000),
-        cleared: false
+        ...updatedTransaction,
+        id: transaction.id
       })
     }
-
-    // Reset form
-    setFormData({
-      date: format(new Date(), 'yyyy-MM-dd'),
-      account: "Default Account",
-      payee: "",
-      category: "",
-      memo: "",
-      outflow: "",
-      inflow: ""
-    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -97,28 +72,30 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
   }
 
   return (
-    <div className="relative" ref={rowRef}>
-      <div className="flex h-[42px] bg-blue-100 hover:bg-blue-200 border-b border-gray-200">
-        <div className="w-[50px] shrink-0 flex items-center justify-center border-r-2 border-gray-200">
+    <>
+      <div className="flex h-[42px] bg-blue-50/50 hover:bg-blue-100/50 border-b border-gray-200">
+        <div className="w-[50px] shrink-0 flex items-center justify-center">
           <Checkbox 
-            checked={isSelected}
-            onCheckedChange={(checked: CheckedState) => setIsSelected(checked as boolean)}
+            checked={false}
             disabled
           />
         </div>
-        <div className="w-[50px] shrink-0 flex items-center justify-center border-r-2 border-gray-200">
+        <div className="w-[50px] shrink-0 flex items-center justify-center">
           <Button
             variant="ghost"
             size="sm"
             className="h-4 w-4 p-0"
           >
-            <div className="h-2 w-2 rounded-full mx-auto bg-gray-300" />
+            <div className={cn(
+              "h-2 w-2 rounded-full mx-auto",
+              transaction.cleared ? "bg-green-500" : "bg-gray-300"
+            )} />
           </Button>
         </div>
-        <div className="w-[180px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
-          <span className="font-medium whitespace-nowrap">Default Account</span>
+        <div className="w-[180px] shrink-0 flex items-center px-4">
+          <span className="font-medium whitespace-nowrap">{transaction.account}</span>
         </div>
-        <div className="w-[140px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[140px] shrink-0 flex items-center px-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -153,7 +130,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             </PopoverContent>
           </Popover>
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[220px] shrink-0 flex items-center px-4">
           <Input
             placeholder="Payee"
             value={formData.payee}
@@ -162,7 +139,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[220px] shrink-0 flex items-center px-4">
           <Input
             placeholder="Category"
             value={formData.category}
@@ -171,7 +148,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[220px] shrink-0 flex items-center px-4">
           <Input
             placeholder="Memo"
             value={formData.memo}
@@ -180,7 +157,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[160px] shrink-0 flex items-center px-4">
           <Input
             type="number"
             placeholder="0.00"
@@ -193,7 +170,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[160px] shrink-0 flex items-center px-4">
           <Input
             type="number"
             placeholder="0.00"
@@ -210,7 +187,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
       </div>
 
       <div className="border-b border-gray-200">
-        <div className="py-2 px-4 flex justify-end gap-2 bg-blue-100">
+        <div className="py-2 px-4 flex justify-end gap-2">
           <Button 
             variant="default"
             onClick={handleSave}
@@ -219,26 +196,14 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             Save
           </Button>
           <Button 
-            variant="outline"
-            onClick={() => {
-              handleSave()
-              // Keep focus on date input for next entry
-              const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-              if (dateInput) dateInput.focus()
-            }}
-            className="h-8 px-3 text-sm font-semibold rounded-md border-gray-200 hover:bg-blue-50"
-          >
-            Save and Add Another
-          </Button>
-          <Button 
             variant="ghost"
-            onClick={() => onCancel?.()}
+            onClick={onCancel}
             className="h-8 px-3 text-sm font-semibold rounded-md hover:bg-gray-100"
           >
             Cancel
           </Button>
         </div>
       </div>
-    </div>
+    </>
   )
 }
