@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect, useContext } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -9,8 +9,9 @@ import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { useTransactions, Transaction } from "@/context/transaction-context"
-import type { CheckedState } from "@radix-ui/react-checkbox"
+import { useTransactions } from "@/context/transaction-context"
+import type { Transaction } from "@/context/transaction-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface TransactionInputRowProps {
   onSave?: (transaction: Transaction) => void
@@ -18,95 +19,82 @@ interface TransactionInputRowProps {
 }
 
 export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowProps) {
-  const { addTransaction } = useTransactions()
-  const [isSelected, setIsSelected] = useState(false)
-  const rowRef = useRef<HTMLDivElement>(null)
-
+  const { accounts = [], categories = [], addTransaction } = useTransactions()
+  const [isExiting, setIsExiting] = useState(false)
   const [formData, setFormData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    account: "Default Account",
+    date: new Date().toISOString().split('T')[0],
+    account: "",
     payee: "",
     category: "",
     memo: "",
     outflow: "",
-    inflow: ""
+    inflow: "",
+    cleared: false
   })
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (rowRef.current && !rowRef.current.contains(event.target as Node)) {
-        onCancel?.()
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!formData.account || !formData.date) return
+
+    setIsExiting(true)
+    setTimeout(() => {
+      const newTransaction: Omit<Transaction, "id"> = {
+        date: formData.date,
+        account: formData.account,
+        payee: formData.payee || 'Need Input',
+        category: formData.category || '',
+        memo: formData.memo || '',
+        outflow: formData.outflow ? parseFloat(formData.outflow) : 0,
+        inflow: formData.inflow ? parseFloat(formData.inflow) : 0,
+        cleared: false
       }
-    }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [onCancel])
+      addTransaction(newTransaction)
+      
+      if (onSave) {
+        onSave({
+          ...newTransaction,
+          id: Math.floor(Math.random() * 1000000)
+        })
+      }
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
-
-  const handleSave = () => {
-    const outflow = parseFloat(formData.outflow) || 0
-    const inflow = parseFloat(formData.inflow) || 0
-    
-    const newTransaction: Omit<Transaction, "id" | "cleared"> = {
-      date: formData.date,
-      account: formData.account,
-      payee: formData.payee || 'Need Input',
-      category: formData.category || '',
-      memo: formData.memo || '',
-      outflow: outflow,
-      inflow: inflow
-    }
-
-    addTransaction(newTransaction)
-    
-    if (onSave) {
-      onSave({
-        ...newTransaction,
-        id: Math.floor(Math.random() * 1000000),
+      // Reset form
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        account: "",
+        payee: "",
+        category: "",
+        memo: "",
+        outflow: "",
+        inflow: "",
         cleared: false
       })
-    }
-
-    // Reset form
-    setFormData({
-      date: format(new Date(), 'yyyy-MM-dd'),
-      account: "Default Account",
-      payee: "",
-      category: "",
-      memo: "",
-      outflow: "",
-      inflow: ""
-    })
+    }, 150)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSave()
-    } else if (e.key === 'Escape') {
-      onCancel?.()
-    }
+  const handleCancel = () => {
+    setIsExiting(true)
+    setTimeout(onCancel, 150)
   }
 
   return (
-    <div className="relative" ref={rowRef}>
-      <div className="flex h-[42px] bg-blue-100 hover:bg-blue-200 border-b border-gray-200">
-        <div className="w-[50px] shrink-0 flex items-center justify-center border-r-2 border-gray-200">
+    <form 
+      onSubmit={handleSave}
+      className={cn(
+        "transition-all duration-200 ease-in-out bg-blue-50/50",
+        isExiting ? "opacity-0 scale-98 -translate-y-1" : "animate-in slide-in-from-top-2 duration-200"
+      )}
+    >
+      {/* Main Row */}
+      <div className="flex h-[42px] border-b border-blue-100 items-center">
+        <div className="w-[48px] flex justify-center">
           <Checkbox 
-            checked={isSelected}
-            onCheckedChange={(checked: CheckedState) => setIsSelected(checked as boolean)}
+            checked={false}
+            onCheckedChange={(checked) => {}}
             disabled
           />
         </div>
-        <div className="w-[50px] shrink-0 flex items-center justify-center border-r-2 border-gray-200">
+        <div className="w-[48px] flex justify-center">
           <Button
             variant="ghost"
             size="sm"
@@ -115,10 +103,22 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             <div className="h-2 w-2 rounded-full mx-auto bg-gray-300" />
           </Button>
         </div>
-        <div className="w-[180px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
-          <span className="font-medium whitespace-nowrap">Default Account</span>
+        <div className="w-[12%] px-4">
+          <Select
+            value={formData.account}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, account: value }))}
+          >
+            <SelectTrigger className="h-8 w-full bg-white/90 hover:bg-white transition-colors">
+              <SelectValue placeholder="Account" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts?.map((account) => (
+                <SelectItem key={account} value={account}>{account}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="w-[140px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[10%] px-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -142,7 +142,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
                 selected={formData.date ? new Date(formData.date) : undefined}
                 onSelect={(date) => {
                   if (date) {
-                    handleInputChange('date', format(date, 'yyyy-MM-dd'))
+                    setFormData(prev => ({ ...prev, date: format(date, 'yyyy-MM-dd') }))
                   }
                 }}
                 disabled={(date) =>
@@ -153,92 +153,83 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
             </PopoverContent>
           </Popover>
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[15%] px-4">
           <Input
-            placeholder="Payee"
             value={formData.payee}
-            onChange={(e) => handleInputChange('payee', e.target.value)}
-            className="h-8 font-medium"
-            onKeyDown={handleKeyDown}
+            onChange={(e) => setFormData(prev => ({ ...prev, payee: e.target.value }))}
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
+            placeholder="Payee"
           />
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
-          <Input
-            placeholder="Category"
+        <div className="w-[15%] px-4">
+          <Select
             value={formData.category}
-            onChange={(e) => handleInputChange('category', e.target.value)}
-            className="h-8 font-medium"
-            onKeyDown={handleKeyDown}
-          />
+            onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+          >
+            <SelectTrigger className="h-8 w-full bg-white/90 hover:bg-white transition-colors">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories?.map((category) => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="flex-1 px-4">
           <Input
-            placeholder="Memo"
             value={formData.memo}
-            onChange={(e) => handleInputChange('memo', e.target.value)}
-            className="h-8 text-sm"
-            onKeyDown={handleKeyDown}
+            onChange={(e) => setFormData(prev => ({ ...prev, memo: e.target.value }))}
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
+            placeholder="Memo"
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[12%] px-4">
           <Input
             type="number"
-            placeholder="0.00"
             value={formData.outflow}
-            onChange={(e) => handleInputChange('outflow', e.target.value)}
+            onChange={(e) => setFormData(prev => ({ ...prev, outflow: e.target.value }))}
             className={cn(
-              "h-8 text-sm text-right w-full",
+              "h-8 w-full text-right bg-white/90 hover:bg-white transition-colors",
               formData.outflow && "text-red-600"
             )}
-            onKeyDown={handleKeyDown}
+            placeholder="0"
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4 border-r-2 border-gray-200">
+        <div className="w-[12%] px-4">
           <Input
             type="number"
-            placeholder="0.00"
             value={formData.inflow}
-            onChange={(e) => handleInputChange('inflow', e.target.value)}
+            onChange={(e) => setFormData(prev => ({ ...prev, inflow: e.target.value }))}
             className={cn(
-              "h-8 text-sm text-right w-full",
+              "h-8 w-full text-right bg-white/90 hover:bg-white transition-colors",
               formData.inflow && "text-green-600"
             )}
-            onKeyDown={handleKeyDown}
+            placeholder="0"
           />
         </div>
-        <div className="w-[50px] shrink-0" />
+        <div className="w-[48px]" />
       </div>
-
-      <div className="border-b border-gray-200">
-        <div className="py-2 px-4 flex justify-end gap-2 bg-blue-100">
-          <Button 
-            variant="default"
-            onClick={handleSave}
-            className="h-8 px-3 text-sm font-semibold rounded-md bg-blue-600 hover:bg-blue-700"
-          >
-            Save
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => {
-              handleSave()
-              // Keep focus on date input for next entry
-              const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement
-              if (dateInput) dateInput.focus()
-            }}
-            className="h-8 px-3 text-sm font-semibold rounded-md border-gray-200 hover:bg-blue-50"
-          >
-            Save and Add Another
-          </Button>
-          <Button 
-            variant="ghost"
-            onClick={() => onCancel?.()}
-            className="h-8 px-3 text-sm font-semibold rounded-md hover:bg-gray-100"
-          >
-            Cancel
-          </Button>
-        </div>
+      
+      {/* Action buttons in a separate row */}
+      <div className="flex justify-end py-2 pr-[52px] space-x-2 border-b border-blue-100 animate-in fade-in duration-200">
+        <Button
+          type="submit"
+          size="sm"
+          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white transition-all"
+        >
+          Save
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleCancel}
+          className="transition-all active:scale-95"
+        >
+          Cancel
+        </Button>
       </div>
-    </div>
+    </form>
   )
 }
