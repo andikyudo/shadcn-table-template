@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useRef, useEffect, useContext } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -92,7 +92,7 @@ export function TransactionInputRow({ onSave, onCancel }: TransactionInputRowPro
         <div className="w-[48px] flex justify-center">
           <Checkbox 
             checked={false}
-            onCheckedChange={() => {}}
+            onCheckedChange={(checked) => {}}
             disabled
           />
         </div>
