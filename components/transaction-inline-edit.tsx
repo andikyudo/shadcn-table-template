@@ -18,9 +18,14 @@ interface TransactionInlineEditProps {
   onCancel?: () => void
 }
 
-export function TransactionInlineEdit({ transaction, onSave, onCancel }: TransactionInlineEditProps) {
+export function TransactionInlineEdit({
+  transaction,
+  onSave,
+  onCancel,
+}: TransactionInlineEditProps) {
   const { editTransaction } = useTransactions()
 
+  const [isExiting, setIsExiting] = useState(false)
   const [formData, setFormData] = useState({
     date: transaction.date,
     account: transaction.account,
@@ -38,49 +43,63 @@ export function TransactionInlineEdit({ transaction, onSave, onCancel }: Transac
     }))
   }
 
-  const handleSave = () => {
-    const outflow = parseFloat(formData.outflow) || 0
-    const inflow = parseFloat(formData.inflow) || 0
-    
-    const updatedTransaction: Omit<Transaction, "id"> = {
-      date: formData.date,
-      account: formData.account,
-      payee: formData.payee || 'Need Input',
-      category: formData.category || '',
-      memo: formData.memo || '',
-      outflow: outflow,
-      inflow: inflow,
-      cleared: transaction.cleared
-    }
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setIsExiting(true)
+    // Tunggu animasi selesai sebelum memanggil onSave
+    setTimeout(() => {
+      const outflow = parseFloat(formData.outflow) || 0
+      const inflow = parseFloat(formData.inflow) || 0
+      const updatedTransaction: Omit<Transaction, "id"> = {
+        date: formData.date,
+        account: formData.account,
+        payee: formData.payee || 'Need Input',
+        category: formData.category || '',
+        memo: formData.memo || '',
+        outflow: outflow,
+        inflow: inflow,
+        cleared: transaction.cleared
+      }
 
-    editTransaction(transaction.id, updatedTransaction)
-    
-    if (onSave) {
-      onSave({
-        ...updatedTransaction,
-        id: transaction.id
-      })
-    }
+      editTransaction(transaction.id, updatedTransaction)
+      
+      if (onSave) {
+        onSave({
+          ...updatedTransaction,
+          id: transaction.id
+        })
+      }
+    }, 150)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSave()
-    } else if (e.key === 'Escape') {
-      onCancel?.()
+  const handleCancel = () => {
+    setIsExiting(true)
+    // Tunggu animasi selesai sebelum memanggil onCancel
+    if (onCancel) {
+      setTimeout(onCancel, 150)
     }
   }
 
   return (
-    <>
-      <div className="flex h-[42px] bg-blue-50/50 hover:bg-blue-100/50 border-b border-gray-200">
-        <div className="w-[50px] shrink-0 flex items-center justify-center">
+    <form 
+      onSubmit={handleSave}
+      className={cn(
+        "transition-all duration-200 ease-in-out bg-blue-100/50",
+        isExiting ? "opacity-0 scale-98 -translate-y-1" : "animate-in slide-in-from-top-2 duration-200"
+      )}
+    >
+      {/* Main Row */}
+      <div className="flex h-[42px] border-b border-blue-200 items-center transition-colors duration-200 ease-in-out">
+        {/* Checkbox placeholder */}
+        <div className="w-[48px] flex justify-center">
           <Checkbox 
             checked={false}
             disabled
+            className="w-4 h-4"
           />
         </div>
-        <div className="w-[50px] shrink-0 flex items-center justify-center">
+        {/* Status placeholder */}
+        <div className="w-[48px] flex justify-center">
           <Button
             variant="ghost"
             size="sm"
@@ -92,10 +111,18 @@ export function TransactionInlineEdit({ transaction, onSave, onCancel }: Transac
             )} />
           </Button>
         </div>
-        <div className="w-[180px] shrink-0 flex items-center px-4">
-          <span className="font-medium whitespace-nowrap">{transaction.account}</span>
+        {/* Account */}
+        <div className="w-[12%] px-4">
+          <Input
+            type="text"
+            value={formData.account}
+            onChange={(e) => handleInputChange('account', e.target.value)}
+            placeholder="Account"
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
+          />
         </div>
-        <div className="w-[140px] shrink-0 flex items-center px-4">
+        {/* Date */}
+        <div className="w-[10%] px-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -130,80 +157,85 @@ export function TransactionInlineEdit({ transaction, onSave, onCancel }: Transac
             </PopoverContent>
           </Popover>
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4">
+        {/* Payee */}
+        <div className="w-[15%] px-4">
           <Input
-            placeholder="Payee"
+            type="text"
             value={formData.payee}
             onChange={(e) => handleInputChange('payee', e.target.value)}
-            className="h-8 font-medium"
-            onKeyDown={handleKeyDown}
+            placeholder="Payee"
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
           />
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4">
+        {/* Category */}
+        <div className="w-[15%] px-4">
           <Input
-            placeholder="Category"
+            type="text"
             value={formData.category}
             onChange={(e) => handleInputChange('category', e.target.value)}
-            className="h-8 font-medium"
-            onKeyDown={handleKeyDown}
+            placeholder="Category"
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
           />
         </div>
-        <div className="w-[220px] shrink-0 flex items-center px-4">
+        {/* Memo */}
+        <div className="flex-1 px-4">
           <Input
-            placeholder="Memo"
+            type="text"
             value={formData.memo}
             onChange={(e) => handleInputChange('memo', e.target.value)}
-            className="h-8 text-sm"
-            onKeyDown={handleKeyDown}
+            placeholder="Memo"
+            className="h-8 w-full bg-white/90 hover:bg-white transition-colors"
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4">
+        {/* Outflow */}
+        <div className="w-[12%] px-4">
           <Input
             type="number"
-            placeholder="0.00"
             value={formData.outflow}
             onChange={(e) => handleInputChange('outflow', e.target.value)}
+            placeholder="0.00"
             className={cn(
-              "h-8 text-sm text-right w-full",
+              "h-8 text-sm text-right w-full bg-white/90 hover:bg-white transition-colors",
               formData.outflow && "text-red-600"
             )}
-            onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[160px] shrink-0 flex items-center px-4">
+        {/* Inflow */}
+        <div className="w-[12%] px-4">
           <Input
             type="number"
-            placeholder="0.00"
             value={formData.inflow}
             onChange={(e) => handleInputChange('inflow', e.target.value)}
+            placeholder="0.00"
             className={cn(
-              "h-8 text-sm text-right w-full",
+              "h-8 text-sm text-right w-full bg-white/90 hover:bg-white transition-colors",
               formData.inflow && "text-green-600"
             )}
-            onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="w-[50px] shrink-0" />
+        {/* Action buttons placeholder */}
+        <div className="w-[48px]" />
       </div>
-
-      <div className="border-b border-gray-200">
-        <div className="py-2 px-4 flex justify-end gap-2">
-          <Button 
-            variant="default"
-            onClick={handleSave}
-            className="h-8 px-3 text-sm font-semibold rounded-md bg-blue-600 hover:bg-blue-700"
-          >
-            Save
-          </Button>
-          <Button 
-            variant="ghost"
-            onClick={onCancel}
-            className="h-8 px-3 text-sm font-semibold rounded-md hover:bg-gray-100"
-          >
-            Cancel
-          </Button>
-        </div>
+      
+      {/* Action buttons in a separate row */}
+      <div className="flex justify-end py-2 pr-[52px] space-x-2 border-b border-blue-200 animate-in fade-in duration-200">
+        <Button
+          type="submit"
+          size="sm"
+          className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white transition-all"
+        >
+          Save
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleCancel}
+          className="transition-all active:scale-95"
+        >
+          Cancel
+        </Button>
       </div>
-    </>
+    </form>
   )
 }

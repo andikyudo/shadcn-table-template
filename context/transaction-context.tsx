@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext } from "react"
+import React, { createContext, useContext, useState, useEffect } from "react"
 import { useHistory, HistoryProvider } from "./history-context"
 
 export interface Transaction {
@@ -17,20 +17,52 @@ export interface Transaction {
 
 interface TransactionContextType {
   transactions: Transaction[]
+  accounts: string[]
+  categories: string[]
   addTransaction: (transaction: Omit<Transaction, "id" | "cleared">) => void
   editTransaction: (id: number, transaction: Omit<Transaction, "id">) => void
   toggleCleared: (id: number) => void
   deleteTransaction: (id: number) => void
   deleteTransactions: (ids: number[]) => void
   toggleClearedBulk: (ids: number[], cleared: boolean) => void
+  reorderTransaction: (fromIndex: number, toIndex: number) => void
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
 
-const initialTransactions: Transaction[] = [
+const accounts = [
+  "Cash",
+  "Bank BCA",
+  "Bank Mandiri",
+  "Bank BNI",
+  "E-Wallet"
+]
+
+const categories = [
+  "Needs: 🍚 Food",
+  "Needs: 🏠 Housing",
+  "Needs: 🚗 Transportation",
+  "Needs: 👕 Clothing",
+  "Needs: 💊 Healthcare",
+  "Bills: ⚡ Utilities",
+  "Bills: 📱 Phone",
+  "Bills: 🌐 Internet",
+  "Bills: 📺 Streaming",
+  "Wants: 🎬 Entertainment",
+  "Wants: 🎮 Gaming",
+  "Wants: 🛍️ Shopping",
+  "Wants: 🍽️ Dining Out",
+  "Savings: 💰 Emergency Fund",
+  "Savings: 🎯 Goals",
+  "Income: 💼 Salary",
+  "Income: 💸 Freelance",
+  "Income: 📈 Investment"
+]
+
+export const initialTransactions: Transaction[] = [
   {
     id: 1,
-    account: "entah",
+    account: "Bank BCA",
     date: "2025-01-12",
     payee: "Pembelian Netflix",
     category: "Wants: 🎬 Entertainment",
@@ -41,7 +73,7 @@ const initialTransactions: Transaction[] = [
   },
   {
     id: 2,
-    account: "entah",
+    account: "Bank Mandiri",
     date: "2025-01-12",
     payee: "Pembelian Air",
     category: "Bills: ⚡ Utilities",
@@ -49,74 +81,92 @@ const initialTransactions: Transaction[] = [
     outflow: 400,
     inflow: 0,
     cleared: true
-  },
+  }
 ]
 
 export function TransactionProvider({ children }: { children: React.ReactNode }) {
-  const {
-    transactions,
-    pushHistory
-  } = useHistory()
+  const { transactions, pushHistory } = useHistory()
+  const [localTransactions, setLocalTransactions] = useState<Transaction[]>([])
+
+  // Sync with history on mount
+  useEffect(() => {
+    if (transactions.length === 0) {
+      pushHistory(initialTransactions)
+    } else {
+      setLocalTransactions(transactions)
+    }
+  }, [transactions, pushHistory])
 
   const addTransaction = (transaction: Omit<Transaction, "id" | "cleared">) => {
-    const newTransaction = {
+    const newTransaction: Transaction = {
       ...transaction,
-      id: Math.max(0, ...transactions.map(t => t.id)) + 1,
+      id: Math.floor(Math.random() * 1000000),
       cleared: false
     }
-    const newTransactions = [newTransaction, ...transactions]
+    
+    // Add new transaction at the beginning of the array
+    const newTransactions = [newTransaction, ...localTransactions]
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
   const editTransaction = (id: number, transaction: Omit<Transaction, "id">) => {
-    const newTransactions = transactions.map(t =>
-      t.id === id
-        ? { ...transaction, id }
-        : t
+    const newTransactions = localTransactions.map(t => 
+      t.id === id ? { ...transaction, id } : t
     )
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
   const toggleCleared = (id: number) => {
-    const newTransactions = transactions.map(transaction =>
-      transaction.id === id
-        ? { ...transaction, cleared: !transaction.cleared }
-        : transaction
+    const newTransactions = localTransactions.map(t => 
+      t.id === id ? { ...t, cleared: !t.cleared } : t
     )
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
   const deleteTransaction = (id: number) => {
-    const newTransactions = transactions.filter(transaction => transaction.id !== id)
+    const newTransactions = localTransactions.filter(t => t.id !== id)
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
   const deleteTransactions = (ids: number[]) => {
-    const newTransactions = transactions.filter(transaction => !ids.includes(transaction.id))
+    const newTransactions = localTransactions.filter(t => !ids.includes(t.id))
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
   const toggleClearedBulk = (ids: number[], cleared: boolean) => {
-    const newTransactions = transactions.map(transaction =>
-      ids.includes(transaction.id)
-        ? { ...transaction, cleared }
-        : transaction
+    const newTransactions = localTransactions.map(t => 
+      ids.includes(t.id) ? { ...t, cleared } : t
     )
+    setLocalTransactions(newTransactions)
     pushHistory(newTransactions)
   }
 
+  const reorderTransaction = (fromIndex: number, toIndex: number) => {
+    const newTransactions = [...localTransactions];
+    const [movedItem] = newTransactions.splice(fromIndex, 1);
+    newTransactions.splice(toIndex, 0, movedItem);
+    setLocalTransactions(newTransactions);
+    pushHistory(newTransactions);
+  };
+
   return (
-    <TransactionContext.Provider
-      value={{
-        transactions,
-        addTransaction,
-        editTransaction,
-        toggleCleared,
-        deleteTransaction,
-        deleteTransactions,
-        toggleClearedBulk
-      }}
-    >
+    <TransactionContext.Provider value={{
+      transactions: localTransactions,
+      accounts,
+      categories,
+      addTransaction,
+      editTransaction,
+      toggleCleared,
+      deleteTransaction,
+      deleteTransactions,
+      toggleClearedBulk,
+      reorderTransaction
+    }}>
       {children}
     </TransactionContext.Provider>
   )
@@ -125,14 +175,14 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 export function useTransactions() {
   const context = useContext(TransactionContext)
   if (context === undefined) {
-    throw new Error("useTransactions must be used within a TransactionProvider")
+    throw new Error('useTransactions must be used within a TransactionProvider')
   }
   return context
 }
 
 export function RootTransactionProvider({ children }: { children: React.ReactNode }) {
   return (
-    <HistoryProvider initialTransactions={initialTransactions}>
+    <HistoryProvider>
       <TransactionProvider>
         {children}
       </TransactionProvider>

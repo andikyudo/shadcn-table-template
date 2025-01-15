@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useReducer, useCallback } from "react"
-import { Transaction } from "./transaction-context"
+import { Transaction, initialTransactions } from "./transaction-context"
 
 type HistoryState = {
   past: Transaction[][]
@@ -22,6 +22,9 @@ function historyReducer(state: HistoryState, action: HistoryAction): HistoryStat
 
   switch (action.type) {
     case "PUSH":
+      if (JSON.stringify(present) === JSON.stringify(action.newPresent)) {
+        return state
+      }
       return {
         past: [...past, present].slice(-HISTORY_LIMIT),
         present: action.newPresent,
@@ -54,7 +57,7 @@ function historyReducer(state: HistoryState, action: HistoryAction): HistoryStat
     case "CLEAR":
       return {
         past: [],
-        present: present,
+        present: initialTransactions,
         future: []
       }
     default:
@@ -74,13 +77,7 @@ interface HistoryContextType {
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined)
 
-export function HistoryProvider({ 
-  children,
-  initialTransactions
-}: { 
-  children: React.ReactNode
-  initialTransactions: Transaction[]
-}) {
+export function HistoryProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(historyReducer, {
     past: [],
     present: initialTransactions,
@@ -123,7 +120,7 @@ export function HistoryProvider({
 export function useHistory() {
   const context = useContext(HistoryContext)
   if (context === undefined) {
-    throw new Error("useHistory must be used within a HistoryProvider")
+    throw new Error('useHistory must be used within a HistoryProvider')
   }
   return context
 }
