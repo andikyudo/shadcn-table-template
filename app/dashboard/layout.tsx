@@ -15,9 +15,9 @@ import {
 import { LayoutDashboard, Target, Wallet, Calculator } from "lucide-react"
 import { RootTransactionProvider } from "@/context/transaction-context"
 import { SettingsMenu } from "@/components/settings-menu"
-import { BudgetDropdown } from "@/components/budget-dropdown"
 import { cn } from "@/lib/utils"
 import { useEffect } from "react"
+import { BudgetDropdown } from "@/components/budget-dropdown"
 
 export default function DashboardLayout({
   children,
@@ -79,7 +79,7 @@ export default function DashboardLayout({
           <div className="flex">
             <Sidebar>
               <div className="flex h-full flex-col">
-                <SidebarHeader className="border-b">
+                <SidebarHeader className="p-4 border-b">
                   <SettingsMenu />
                 </SidebarHeader>
                 <SidebarContent>
@@ -91,7 +91,7 @@ export default function DashboardLayout({
                           key={index}
                           variant={pathname === item.href ? "secondary" : "ghost"}
                           className={cn(
-                            "w-full overflow-hidden text-base",
+                            "w-full overflow-hidden",
                             expanded ? "justify-start" : "justify-center"
                           )}
                           onClick={(e) => {
@@ -100,12 +100,12 @@ export default function DashboardLayout({
                           }}
                         >
                           <item.icon className={cn(
-                            "h-5 w-5",
+                            "h-4 w-4",
                             expanded ? "mr-2" : ""
                           )} />
                           <span className={cn(
                             "transition-all duration-300",
-                            expanded ? "opacity-100" : "w-0 opacity-0"
+                            expanded ? "opacity-100" : "w-0 opacity-0 hidden"
                           )}>
                             {item.title}
                           </span>
@@ -114,25 +114,25 @@ export default function DashboardLayout({
                     </div>
                     <div className="space-y-2">
                       <ModeToggle className={cn(
-                        "w-full text-base",
+                        "w-full",
                         expanded ? "" : "px-0"
                       )} />
                       <SidebarTrigger asChild>
                         <Button 
                           variant="outline" 
                           className={cn(
-                            "w-full overflow-hidden text-base",
+                            "w-full overflow-hidden",
                             expanded ? "justify-start" : "justify-center"
                           )}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <ChevronLeft className={cn(
-                            "h-5 w-5 transition-transform",
+                            "h-4 w-4 transition-transform",
                             expanded ? "mr-2" : "rotate-180"
                           )} />
                           <span className={cn(
                             "transition-all duration-300",
-                            expanded ? "opacity-100" : "w-0 opacity-0"
+                            expanded ? "opacity-100" : "w-0 opacity-0 hidden"
                           )}>
                             Collapse
                           </span>
